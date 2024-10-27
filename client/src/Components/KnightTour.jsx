@@ -239,6 +239,30 @@ export default function KnightTour() {
           Click on the highlighted cells to make valid knight moves
         </div>
       )}
+
+      <footer className="mt-8 p-4 bg-gray-800 rounded-lg shadow-lg w-full max-w-2xl">
+        <h2 className="text-xl font-semibold text-center mb-2 bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-green-400">
+          Design and Analysis of Algorithms
+        </h2>
+        <div className="grid grid-cols-2 gap-4 text-sm">
+          <div>
+            <p>Swaraj Mahadik</p>
+            <p className="text-gray-400">PRN: 122B1B159</p>
+          </div>
+          <div>
+            <p>Anuj Loharkar</p>
+            <p className="text-gray-400">PRN: 122B1B154</p>
+          </div>
+          <div>
+            <p>Anurag Lengure</p>
+            <p className="text-gray-400">PRN: 122B1B152</p>
+          </div>
+          <div>
+            <p>Rushikesh Magdum</p>
+            <p className="text-gray-400">PRN: 122B1B158</p>
+          </div>
+        </div>
+      </footer>
     </div>
   );
 }
