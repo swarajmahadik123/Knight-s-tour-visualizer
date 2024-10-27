@@ -1,5 +1,3 @@
-"use client";
-
 import React, { useState, useCallback, useEffect } from "react";
 
 export default function KnightTour() {
@@ -10,6 +8,8 @@ export default function KnightTour() {
   const [moveCount, setMoveCount] = useState(0);
   const [validMoves, setValidMoves] = useState([]);
   const [startPosition, setStartPosition] = useState(null);
+  const [solution, setSolution] = useState(null);
+  const [showingSolution, setShowingSolution] = useState(false);
 
   // Knight's possible moves
   const knightMoves = [
@@ -37,11 +37,59 @@ export default function KnightTour() {
     [boardSize]
   );
 
+  // Warnsdorff's algorithm for finding a knight's tour
+  const findSolution = useCallback(
+    (startX, startY) => {
+      const solutionBoard = initializeBoard(boardSize);
+      const visited = new Set();
+
+      const getAccessibility = (x, y) => {
+        return knightMoves.filter(([dx, dy]) => {
+          const newX = x + dx;
+          const newY = y + dy;
+          return isValidMove(newX, newY, solutionBoard);
+        }).length;
+      };
+
+      const findTourUtil = (x, y, moveNum) => {
+        solutionBoard[x][y] = moveNum;
+        visited.add(`${x},${y}`);
+
+        if (visited.size === boardSize * boardSize) {
+          return true;
+        }
+
+        // Get all possible moves and sort them by accessibility (Warnsdorff's rule)
+        const possibleMoves = knightMoves
+          .map(([dx, dy]) => ({
+            x: x + dx,
+            y: y + dy,
+            accessibility: getAccessibility(x + dx, y + dy),
+          }))
+          .filter((move) => isValidMove(move.x, move.y, solutionBoard))
+          .sort((a, b) => a.accessibility - b.accessibility);
+
+        for (const move of possibleMoves) {
+          if (findTourUtil(move.x, move.y, moveNum + 1)) {
+            return true;
+          }
+        }
+
+        solutionBoard[x][y] = -1;
+        visited.delete(`${x},${y}`);
+        return false;
+      };
+
+      findTourUtil(startX, startY, 0);
+      return solutionBoard;
+    },
+    [boardSize, initializeBoard, isValidMove]
+  );
+
   // Calculate valid moves from current position
   const calculateValidMoves = useCallback(
     (position) => {
       if (!position) return [];
-
       return knightMoves
         .map(([dx, dy]) => ({
           x: position.x + dx,
@@ -63,6 +111,8 @@ export default function KnightTour() {
       setMoveCount(1);
       setGameStatus("playing");
       setValidMoves(calculateValidMoves({ x, y }));
+      setShowingSolution(false);
+      setSolution(null);
     },
     [boardSize, initializeBoard, calculateValidMoves]
   );
@@ -75,9 +125,8 @@ export default function KnightTour() {
         return;
       }
 
-      if (gameStatus !== "playing") return;
+      if (gameStatus !== "playing" || showingSolution) return;
 
-      // Check if clicked position is a valid move
       const isValid = validMoves.some((move) => move.x === x && move.y === y);
 
       if (!isValid) {
@@ -85,18 +134,15 @@ export default function KnightTour() {
         return;
       }
 
-      // Make the move
       const newBoard = [...board];
       newBoard[x][y] = moveCount;
       setBoard(newBoard);
       setKnightPosition({ x, y });
       setMoveCount(moveCount + 1);
 
-      // Calculate new valid moves
       const newValidMoves = calculateValidMoves({ x, y });
       setValidMoves(newValidMoves);
 
-      // Check win condition
       if (moveCount === boardSize * boardSize - 1) {
         setGameStatus("won");
       } else if (newValidMoves.length === 0) {
@@ -111,6 +157,7 @@ export default function KnightTour() {
       boardSize,
       calculateValidMoves,
       startGame,
+      showingSolution,
     ]
   );
 
@@ -123,6 +170,15 @@ export default function KnightTour() {
     setKnightPosition(null);
     setStartPosition(null);
     setValidMoves([]);
+    setSolution(null);
+    setShowingSolution(false);
+  };
+
+  const handleShowSolution = () => {
+    if (!startPosition) return;
+    const solutionBoard = findSolution(startPosition.x, startPosition.y);
+    setSolution(solutionBoard);
+    setShowingSolution(true);
   };
 
   // Initialize board
@@ -139,13 +195,17 @@ export default function KnightTour() {
         (move) => move.x === rowIndex && move.y === colIndex
       );
       const isVisited = board[rowIndex][colIndex] !== -1;
+      const isSolutionCell =
+        showingSolution && solution?.[rowIndex][colIndex] !== -1;
 
       return `relative flex items-center justify-center w-14 h-14 border cursor-pointer
         ${
           isKnightPosition
             ? "bg-blue-500 shadow-[0_0_15px_5px_rgba(59,130,246,0.5)]"
-            : isValidMove && gameStatus === "playing"
+            : isValidMove && gameStatus === "playing" && !showingSolution
             ? "bg-green-200 hover:bg-green-300 shadow-[0_0_10px_2px_rgba(16,185,129,0.5)]"
+            : isSolutionCell
+            ? "bg-purple-200"
             : isVisited
             ? "bg-gray-200"
             : gameStatus === "setup"
@@ -154,7 +214,7 @@ export default function KnightTour() {
         }
         font-semibold rounded transition-all duration-300 ease-in-out`;
     },
-    [knightPosition, validMoves, board, gameStatus]
+    [knightPosition, validMoves, board, gameStatus, showingSolution, solution]
   );
 
   return (
@@ -192,14 +252,37 @@ export default function KnightTour() {
           )}
         </div>
 
-        {(gameStatus === "won" || gameStatus === "lost") && (
-          <button
-            onClick={() => startGame(startPosition.x, startPosition.y)}
-            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors duration-300"
-          >
-            Play Again
-          </button>
-        )}
+        <div className="flex gap-4">
+          {(gameStatus === "won" || gameStatus === "lost") && (
+            <button
+              onClick={() => startGame(startPosition.x, startPosition.y)}
+              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors duration-300"
+            >
+              Play Again
+            </button>
+          )}
+
+          {startPosition && !showingSolution && (
+            <button
+              onClick={handleShowSolution}
+              className="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 transition-colors duration-300"
+            >
+              Show Solution
+            </button>
+          )}
+
+          {showingSolution && (
+            <button
+              onClick={() => {
+                setShowingSolution(false);
+                setSolution(null);
+              }}
+              className="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 transition-colors duration-300"
+            >
+              Hide Solution
+            </button>
+          )}
+        </div>
       </div>
 
       <div
@@ -208,7 +291,7 @@ export default function KnightTour() {
           gridTemplateColumns: `repeat(${boardSize}, 60px)`,
         }}
       >
-        {board.map((row, rowIndex) =>
+        {(showingSolution ? solution : board).map((row, rowIndex) =>
           row.map((cell, colIndex) => (
             <div
               key={`${rowIndex}-${colIndex}`}
@@ -217,16 +300,17 @@ export default function KnightTour() {
             >
               {cell !== -1 && (
                 <div className="absolute inset-0 flex flex-col items-center justify-center">
-                  <span className="text-xs text-gray-300">{cell}</span>
+                  <span className="text-xs text-gray-600">{cell}</span>
                   {cell > 0 && (
-                    <span className="text-[10px] text-gray-400">
+                    <span className="text-[10px] text-gray-600">
                       Jump {cell}
                     </span>
                   )}
                 </div>
               )}
               {knightPosition?.x === rowIndex &&
-                knightPosition?.y === colIndex && (
+                knightPosition?.y === colIndex &&
+                !showingSolution && (
                   <span className="text-2xl text-white animate-pulse">♞</span>
                 )}
             </div>
@@ -234,7 +318,7 @@ export default function KnightTour() {
         )}
       </div>
 
-      {gameStatus === "playing" && (
+      {gameStatus === "playing" && !showingSolution && (
         <div className="text-gray-400 mt-4">
           Click on the highlighted cells to make valid knight moves
         </div>
